@@ -72,21 +72,41 @@ async function startBot() {
 });
 
 
-  // === Message Listener ===
-  sock.ev.on("messages.upsert", async ({ messages }) => {
-    const message = messages[0];
-    if (!message.message) return;
+//   // === Message Listener ===
+//   sock.ev.on("messages.upsert", async ({ messages }) => {
+//     const message = messages[0];
+//     if (!message.message) return;
 
-    const text = message.message.conversation;
-    const sender = message.key.remoteJid;
+//     const text = message.message.conversation;
+//     const sender = message.key.remoteJid;
 
-    console.log(`📩 Received message from ${sender}: ${text}`);
+//     console.log(`📩 Received message from ${sender}: ${text}`);
 
-    const reply = await handleModelResponse(text);
-    await sendMessage(sock, sender, reply);
+//     const reply = await handleModelResponse(text);
+//     await sendMessage(sock, sender, reply);
 
-    console.log(`📤 Replied to ${sender}: ${reply}`);
-  });
+//     console.log(`📤 Replied to ${sender}: ${reply}`);
+//   });
+
+// === Message Listener ===
+sock.ev.on("messages.upsert", async ({ messages }) => {
+  const message = messages[0];
+
+  // Skip if there's no message or if it's sent by ourselves
+  if (!message.message || message.key.fromMe) return;
+
+  const text = message.message.conversation;
+  const sender = message.key.remoteJid;
+
+  console.log(`📩 Received message from ${sender}: ${text}`);
+
+  const reply = await handleModelResponse(text);
+  await sendMessage(sock, sender, reply);
+
+  console.log(`📤 Replied to ${sender}: ${reply}`);
+});
+
+
 }
 
 startBot();
