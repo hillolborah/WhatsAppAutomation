@@ -10,7 +10,10 @@ const {
 const { Boom } = await import('@hapi/boom');
 import fetch from 'node-fetch';
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+dotenv.config({ path: path.resolve('../.env') });
+
+import { logMessage } from './messageLogger.js';  // 👈 you were missing this line
 
 // === Model Inference Handler ===
 async function handleModelResponse(prompt) {
@@ -51,62 +54,45 @@ async function startBot() {
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on("connection.update", (update) => {
-  const { connection, lastDisconnect, qr } = update;
+    const { connection, lastDisconnect, qr } = update;
 
-  // ✅ Show QR code if provided
-  if (qr) {
-    console.log("📱 Scan this QR code to log in:");
-    qrcode.generate(qr, { small: true });
-  }
+    if (qr) {
+      console.log("📱 Scan this QR code to log in:");
+      qrcode.generate(qr, { small: true });
+    }
 
-  if (connection === 'close') {
-    const shouldReconnect =
-      lastDisconnect?.error instanceof Boom
-        ? lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut
-        : true;
-    console.log("connection closed due to", lastDisconnect?.error, ", reconnecting:", shouldReconnect);
-    if (shouldReconnect) startBot();
-  } else if (connection === 'open') {
-    console.log("✅ WhatsApp bot connected!");
-  }
-});
+    if (connection === 'close') {
+      const shouldReconnect =
+        lastDisconnect?.error instanceof Boom
+          ? lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut
+          : true;
+      console.log("connection closed due to", lastDisconnect?.error, ", reconnecting:", shouldReconnect);
+      if (shouldReconnect) startBot();
+    } else if (connection === 'open') {
+      console.log("✅ WhatsApp bot connected!");
+    }
+  });
 
+  // === Message Listener ===
+  sock.ev.on("messages.upsert", async ({ messages }) => {
+    const message = messages[0];
+    if (!message.message || message.key.fromMe) return;
 
-//   // === Message Listener ===
-//   sock.ev.on("messages.upsert", async ({ messages }) => {
-//     const message = messages[0];
-//     if (!message.message) return;
+    const text = message.message.conversation;
+    const sender = message.key.remoteJid;
 
-//     const text = message.message.conversation;
-//     const sender = message.key.remoteJid;
+    console.log(`📩 Received message from ${sender}: ${text}`);
 
-//     console.log(`📩 Received message from ${sender}: ${text}`);
+    let reply = "";
 
-//     const reply = await handleModelResponse(text);
-//     await sendMessage(sock, sender, reply);
+    if (process.env.ENABLE_MODEL_RESPONSE === 'true') {
+      reply = await handleModelResponse(text);
+      await sendMessage(sock, sender, reply);
+      console.log(`📤 Replied to ${sender}: ${reply}`);
+    }
 
-//     console.log(`📤 Replied to ${sender}: ${reply}`);
-//   });
-
-// === Message Listener ===
-sock.ev.on("messages.upsert", async ({ messages }) => {
-  const message = messages[0];
-
-  // Skip if there's no message or if it's sent by ourselves
-  if (!message.message || message.key.fromMe) return;
-
-  const text = message.message.conversation;
-  const sender = message.key.remoteJid;
-
-  console.log(`📩 Received message from ${sender}: ${text}`);
-
-  const reply = await handleModelResponse(text);
-  await sendMessage(sock, sender, reply);
-
-  console.log(`📤 Replied to ${sender}: ${reply}`);
-});
-
-
+    logMessage(text, reply, sender);
+  });
 }
 
 startBot();
