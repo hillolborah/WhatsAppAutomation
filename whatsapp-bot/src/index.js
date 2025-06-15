@@ -15,15 +15,19 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { logBotInteraction, logUserInteraction } from './logger/messageLogger.js';
+// import { logBotInteraction, logUserInteraction } from './logger/messageLogger.js';
 
 // === Resolve current directory
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.join(__dirname, '../../');  // Adjust if your src is directly inside whatsapp-bot
+const projectRoot = path.join(__dirname, '../../');
 
 // Load .env from project root
 dotenv.config({ path: path.join(projectRoot, '.env') });
+
+// Read config values
+const ENABLE_LOGGING = process.env.ENABLE_LOGGING === 'true';
+const MODEL_NAME = process.env.MODEL_NAME || 'phi4';
 
 // ====== GLOBAL ERROR HANDLERS ======
 process.on('uncaughtException', (err) => {
@@ -34,6 +38,10 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error("💥 Unhandled Rejection at:", promise, "reason:", reason);
 });
 
+// === Import logger factory
+import { createLoggers } from './logger/messageLogger.js';
+const { logBotInteraction, logUserInteraction } = createLoggers(ENABLE_LOGGING);
+
 // === Model Inference Handler ===
 async function handleModelResponse(prompt) {
   try {
@@ -41,7 +49,7 @@ async function handleModelResponse(prompt) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: process.env.MODEL_NAME || "phi4",
+        model: MODEL_NAME,
         prompt: prompt,
         stream: false
       })
