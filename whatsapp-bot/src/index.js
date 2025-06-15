@@ -15,7 +15,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// import { logBotInteraction, logUserInteraction } from './logger/messageLogger.js';
+// ✅ New session logger
+import { logSessionMessage, flushSession } from './logger/sessionLogger.js';
 
 // === Resolve current directory
 const __filename = fileURLToPath(import.meta.url);
@@ -33,14 +34,9 @@ const MODEL_NAME = process.env.MODEL_NAME || 'phi4';
 process.on('uncaughtException', (err) => {
   console.error("💥 Uncaught Exception:", err);
 });
-
 process.on('unhandledRejection', (reason, promise) => {
   console.error("💥 Unhandled Rejection at:", promise, "reason:", reason);
 });
-
-// === Import logger factory
-import { createLoggers } from './logger/messageLogger.js';
-const { logBotInteraction, logUserInteraction } = createLoggers(ENABLE_LOGGING);
 
 // === Model Inference Handler ===
 async function handleModelResponse(prompt) {
@@ -105,26 +101,45 @@ async function startBot() {
   // === Message Listener ===
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const message = messages[0];
-    if (!message.message || message.key.fromMe) return;
+    if (!message.message) return;
 
     const text = message.message.conversation;
     const sender = message.key.remoteJid;
-
     if (!text) return;
-
-    console.log(`📩 Message from ${sender}: ${text}`);
 
     const isModelEnabled = process.env.ENABLE_MODEL_RESPONSE === 'true';
 
-    if (isModelEnabled) {
-      const reply = await handleModelResponse(text);
-      await sendMessage(sock, sender, reply);
-      console.log(`📤 Replied to ${sender}: ${reply}`);
-      logBotInteraction(text, reply, sender);
-    } else {
-      logUserInteraction(sender, text);
+    // Incoming user message
+    if (!message.key.fromMe) {
+      console.log(`📩 Message from ${sender}: ${text}`);
+      logSessionMessage(sender, text, false);
+
+      if (isModelEnabled) {
+        const reply = await handleModelResponse(text);
+        await sendMessage(sock, sender, reply);
+        console.log(`📤 Replied to ${sender}: ${reply}`);
+        logSessionMessage(sender, reply, true);
+      }
+    }
+
+    // Outgoing message (typed by npc user in user-user test mode)
+    if (message.key.fromMe && !isModelEnabled) {
+      console.log(`📤 Outgoing (npc) message to ${sender}: ${text}`);
+      logSessionMessage(sender, text, true);
     }
   });
 }
 
 startBot();
+
+// Cleanly flush session on exit
+process.on('SIGINT', () => {
+  console.log('🛑 Caught interrupt signal (SIGINT). Flushing session...');
+  flushSession();
+  process.exit();
+});
+process.on('SIGTERM', () => {
+  console.log('🛑 Caught termination signal (SIGTERM). Flushing session...');
+  flushSession();
+  process.exit();
+});
