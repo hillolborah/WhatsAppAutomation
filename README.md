@@ -25,11 +25,11 @@ cd WhatsAppAutomation
 npm install
 ```
 
-## ⚙️ Ollama Setup
+### Ollama Setup
 
 Ensure [Ollama](https://ollama.com/download) is installed and running locally.
 
-### 📄 Check Ollama service:
+### Check Ollama service:
 
 ```
 systemctl status ollama
@@ -41,13 +41,13 @@ ollama list
 ```
 
 
-##Run an Ollama model
+## Run an Ollama model
 ```
 ollama run phi4
 ```
 
 
-## 📲 WhatsApp Bot Setup
+## WhatsApp Bot Setup
 
 ### 1️⃣ Configure Environment
 
