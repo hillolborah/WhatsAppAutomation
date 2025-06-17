@@ -62,6 +62,11 @@ nano .env
 node whatsapp-bot/src/index.js
 ```
 
+## 🎥 Demo
+
+![Bot conversation demo](assets/demo.gif)
+
+
 
 
 
